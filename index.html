@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gpsf — Mock Location / Fake GPS for Android</title>
+<meta name="description" content="gpsf: an open-source Android mock-location (fake GPS) app built with Jetpack Compose and Material 3. Pick a spot on OpenStreetMap and simulate your device location.">
+<style>
+  :root {
+    --bg: #0f1419;
+    --bg-soft: #161d26;
+    --card: #1c2530;
+    --border: #2a3644;
+    --text: #e6edf3;
+    --muted: #9aa7b4;
+    --accent: #4cc38a;
+    --accent-2: #58a6ff;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(15, 20, 25, 0.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; }
+  .brand { font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  nav .links { display: flex; gap: 20px; font-size: 14px; }
+  nav .links a { color: var(--muted); text-decoration: none; }
+  nav .links a:hover { color: var(--text); }
+
+  /* Hero */
+  .hero { padding: 72px 0 56px; text-align: center; }
+  .hero .emoji { font-size: 56px; line-height: 1; }
+  .hero h1 { font-size: clamp(34px, 6vw, 52px); font-weight: 800; letter-spacing: -0.02em; margin: 16px 0 8px; }
+  .hero h1 .accent { color: var(--accent); }
+  .hero .tagline { font-size: clamp(16px, 2.4vw, 20px); color: var(--muted); max-width: 620px; margin: 0 auto; }
+  .badges { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 28px; }
+  .badge {
+    font-size: 13px; padding: 6px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--bg-soft); color: var(--muted);
+  }
+  .badge b { color: var(--text); font-weight: 600; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 34px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 15px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn.primary { background: var(--accent); color: #08120c; box-shadow: 0 8px 24px rgba(76, 195, 138, 0.35); }
+  .btn.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .btn.ghost { background: transparent; color: var(--accent-2); border: 1px solid rgba(88, 166, 255, 0.4); }
+
+  /* Sections */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  section h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+  section .sub { color: var(--muted); margin-bottom: 32px; max-width: 640px; }
+
+  /* Screenshots */
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+  .shot {
+    border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--border); background: var(--card);
+  }
+  .shot img { width: 100%; height: 460px; object-fit: cover; display: block; background: #000; }
+  .shot .cap { padding: 10px 14px; font-size: 13px; color: var(--muted); }
+
+  /* Features */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 22px;
+  }
+  .card .ic { font-size: 24px; }
+  .card h3 { font-size: 16px; margin: 10px 0 6px; }
+  .card p { font-size: 14px; color: var(--muted); }
+
+  /* How it works */
+  ol.steps { list-style: none; counter-reset: step; display: grid; gap: 14px; }
+  ol.steps li {
+    counter-increment: step; position: relative;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px 18px 64px; font-size: 15px;
+  }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute; left: 18px; top: 18px;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent); color: #08120c; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  ol.steps code { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-size: 13px; }
+
+  /* Requirements */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td b { color: var(--text); }
+
+  /* Footer */
+  footer { padding: 40px 0 56px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+  footer a { color: var(--accent-2); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    .hero { padding: 48px 0 40px; }
+    nav .links { display: none; }
+    .shot img { height: 380px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <div class="brand"><span class="dot"></span> gpsf</div>
+      <div class="links">
+        <a href="#screenshots">Screenshots</a>
+        <a href="#features">Features</a>
+        <a href="#usage">Usage</a>
+        <a href="#requirements">Requirements</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="emoji">📍</div>
+    <h1>Mock location, <span class="accent">right from the map</span></h1>
+    <p class="tagline">
+      gpsf is an open-source <b>fake GPS / mock location</b> app for Android.
+      Tap any spot on an OpenStreetMap map and simulate your device location there —
+      with a subtle 50&nbsp;m jitter so the mock never looks “frozen”.
+    </p>
+    <div class="badges">
+      <span class="badge"><b>Android 8.0+</b> (API 26)</span>
+      <span class="badge">Jetpack <b>Compose</b> + Material 3</span>
+      <span class="badge">OpenStreetMap (<b>osmdroid</b>)</span>
+      <span class="badge">Foreground <b>mock GPS</b> service</span>
+      <span class="badge">MIT <b>licensed</b></span>
+    </div>
+    <div class="cta-row">
+      <a class="btn primary" href="https://github.com/ngodingsendiri/gpsf/releases/latest">⬇&nbsp; Download APK</a>
+      <a class="btn secondary" href="#usage">How to use it</a>
+      <a class="btn ghost" href="https://github.com/ngodingsendiri/gpsf">View source on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <p class="sub">Pick a location on the map, then press play — the foreground service handles the rest.</p>
+    <div class="shots">
+      <figure class="shot"><img src="screenshot/Screenshot_1.png" alt="gpsf map with location pin"><figcaption class="cap">Tap the map to drop a pin</figcaption></figure>
+      <figure class="shot"><img src="screenshot/Screenshot_2.png" alt="gpsf mock active"><figcaption class="cap">Mock active — location is being simulated</figcaption></figure>
+      <figure class="shot"><img src="screenshot/Screenshot_3.png" alt="gpsf app overview"><figcaption class="cap">Material 3 UI with dynamic color</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Features</h2>
+    <p class="sub">Everything you need for testing location-based features, in one small APK.</p>
+    <div class="grid">
+      <div class="card"><div class="ic">🗺️</div><h3>Interactive OpenStreetMap</h3><p>Powered by osmdroid — pan, zoom, and tap to choose any coordinate in the world.</p></div>
+      <div class="card"><div class="ic">📡</div><h3>Foreground mock service</h3><p>Simulates GPS + Network providers from a persistent foreground service, even while other apps run.</p></div>
+      <div class="card"><div class="ic">🎲</div><h3>50 m random jitter</h3><p>Adds a small random offset around your pin so the mock looks like real movement, not a static coordinate.</p></div>
+      <div class="card"><div class="ic">🎨</div><h3>Material 3 UI</h3><p>Modern Compose UI with dynamic color on Android 12+ and automatic dark / light mode.</p></div>
+      <div class="card"><div class="ic">⚙️</div><h3>Developer Options shortcut</h3><p>Jump straight to the “Select mock location app” setting to enable gpsf.</p></div>
+      <div class="card"><div class="ic">🔔</div><h3>Active notification</h3><p>Clear notification while mocking runs, so you always know when it’s active.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="usage">
+  <div class="wrap">
+    <h2>How to use</h2>
+    <p class="sub">Setup takes about a minute: install, allow mock locations, pick a spot, press play.</p>
+    <ol class="steps">
+      <li>Install the APK from <a href="https://github.com/ngodingsendiri/gpsf/releases/latest">GitHub Releases</a>.</li>
+      <li>Enable <b>Developer Options</b> (tap <i>Build number</i> 7× under <i>About phone</i>).</li>
+      <li>Open <i>Settings → Developer Options → Select mock location app</i> and choose <code>gpsf</code>.</li>
+      <li>Open gpsf, tap the map to place a pin, then press the <b>Play</b> button.</li>
+      <li>To stop, press <b>Stop</b> (the ✕ icon).</li>
+    </ol>
+  </div>
+</section>
+
+<section id="requirements">
+  <div class="wrap">
+    <h2>Requirements</h2>
+    <p class="sub">What your device needs to run gpsf.</p>
+    <div class="card">
+      <table>
+        <tbody>
+          <tr><th>Android version</th><td><b>8.0 (API 26)</b> or newer</td></tr>
+          <tr><th>Internet</th><td>Required for map tiles</td></tr>
+          <tr><th>Permissions</th><td>Location (fine / coarse), notifications (Android 13+)</td></tr>
+          <tr><th>Setup</th><td>Must be selected as the <b>Mock location app</b> in Developer Options</td></tr>
+          <tr><th>License</th><td>MIT</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>gpsf — an open-source mock location app. Use responsibly, for testing &amp; development.</span>
+    <span><a href="https://github.com/ngodingsendiri/gpsf">github.com/ngodingsendiri/gpsf</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
