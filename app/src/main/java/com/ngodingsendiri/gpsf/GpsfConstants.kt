@@ -11,4 +11,11 @@ object GpsfConstants {
     const val PREF_LAT = "lat"
     const val PREF_LNG = "lng"
     const val OSM_PREFS = "osmdroid"
+
+    // Mode provider mock: "both" (GPS+Network), "gps" saja, atau "network" saja
+    // (indirect mocking — aplikasi yang hanya mengecek provider GPS tidak melihat mock).
+    const val PREF_MOCK_MODE = "mock_mode"
+    const val MOCK_MODE_BOTH = "both"
+    const val MOCK_MODE_GPS = "gps"
+    const val MOCK_MODE_NETWORK = "network"
 }

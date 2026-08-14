@@ -86,8 +86,10 @@ git push origin v1.0.0
 
 | File | Peran |
 |------|--------|
-| `MainActivity.kt` | UI Compose, peta OSM, start/stop mock |
+| `MainActivity.kt` | UI Compose, peta OSM, start/stop mock, mode provider |
 | `MockLocationService.kt` | Foreground service + test location providers |
+| `OsmMapConfig.kt` | Konfigurasi osmdroid (UA, cache, tile OSM/Carto) |
+| `GpsMath.kt` | Matematika GPS murni (haversine, bearing, random walk) |
 | `GpsfConstants.kt` | Konstanta bersama (radius, default koordinat) |
 | `app/build.gradle.kts` | Modul Android (Compose, osmdroid) |
 

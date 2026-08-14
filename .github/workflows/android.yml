@@ -55,8 +55,8 @@ jobs:
           jar tf gradle/wrapper/gradle-wrapper.jar >/dev/null
           echo "gradle-wrapper.jar is a valid archive ($(wc -c < gradle/wrapper/gradle-wrapper.jar) bytes)"
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+      - name: Run unit tests + build debug APK
+        run: ./gradlew testDebugUnitTest assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

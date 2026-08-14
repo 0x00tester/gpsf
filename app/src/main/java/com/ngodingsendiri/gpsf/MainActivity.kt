@@ -4,8 +4,13 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color as AndroidColor
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.Message
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -20,7 +25,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +52,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -83,6 +91,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.collectLatest
 import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.tileprovider.MapTileProviderBase
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
@@ -128,6 +137,12 @@ private fun Context.openDeveloperSettings() {
     Toast.makeText(this, "Tidak dapat membuka Developer Options", Toast.LENGTH_SHORT).show()
 }
 
+private fun Context.hasNetwork(): Boolean {
+    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
 class MainActivity : ComponentActivity() {
     private val permLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { /* no-op */ }
@@ -166,6 +181,20 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+fun MockModeChip(
+    label: String,
+    mode: String,
+    selectedMode: String,
+    onSelect: (String) -> Unit
+) {
+    FilterChip(
+        selected = mode == selectedMode,
+        onClick = { onSelect(mode) },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+    )
+}
+
+@Composable
 fun PulsingDot() {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val alpha by infiniteTransition.animateFloat(
@@ -192,14 +221,27 @@ fun GpsfApp() {
         ctx.getSharedPreferences(GpsfConstants.PREFS_NAME, Context.MODE_PRIVATE)
     }
 
+    // runCatching: prefs yang korup (tipe salah) tidak boleh membuat app crash.
+    var mockMode by remember {
+        mutableStateOf(
+            runCatching {
+                sharedPrefs.getString(GpsfConstants.PREF_MOCK_MODE, GpsfConstants.MOCK_MODE_BOTH)
+            }.getOrDefault(GpsfConstants.MOCK_MODE_BOTH) ?: GpsfConstants.MOCK_MODE_BOTH
+        )
+    }
+
     var lat by remember {
         mutableDoubleStateOf(
-            sharedPrefs.getFloat(GpsfConstants.PREF_LAT, GpsfConstants.DEFAULT_LAT.toFloat()).toDouble()
+            runCatching {
+                sharedPrefs.getFloat(GpsfConstants.PREF_LAT, GpsfConstants.DEFAULT_LAT.toFloat())
+            }.getOrDefault(GpsfConstants.DEFAULT_LAT.toFloat()).toDouble()
         )
     }
     var lng by remember {
         mutableDoubleStateOf(
-            sharedPrefs.getFloat(GpsfConstants.PREF_LNG, GpsfConstants.DEFAULT_LNG.toFloat()).toDouble()
+            runCatching {
+                sharedPrefs.getFloat(GpsfConstants.PREF_LNG, GpsfConstants.DEFAULT_LNG.toFloat())
+            }.getOrDefault(GpsfConstants.DEFAULT_LNG.toFloat()).toDouble()
         )
     }
     var centerMapTrigger by remember { mutableIntStateOf(0) }
@@ -237,6 +279,11 @@ fun GpsfApp() {
                 }
             )
         }
+    }
+
+    fun selectMockMode(mode: String) {
+        mockMode = mode
+        sharedPrefs.edit().putString(GpsfConstants.PREF_MOCK_MODE, mode).apply()
     }
 
     Scaffold(
@@ -344,6 +391,32 @@ fun GpsfApp() {
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )
+                        if (!isRunning) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                MockModeChip(
+                                    label = "GPS + Jaringan",
+                                    mode = GpsfConstants.MOCK_MODE_BOTH,
+                                    selectedMode = mockMode,
+                                    onSelect = ::selectMockMode
+                                )
+                                MockModeChip(
+                                    label = "GPS saja",
+                                    mode = GpsfConstants.MOCK_MODE_GPS,
+                                    selectedMode = mockMode,
+                                    onSelect = ::selectMockMode
+                                )
+                                MockModeChip(
+                                    label = "Jaringan saja",
+                                    mode = GpsfConstants.MOCK_MODE_NETWORK,
+                                    selectedMode = mockMode,
+                                    onSelect = ::selectMockMode
+                                )
+                            }
+                        }
                     }
 
                     FloatingActionButton(
@@ -452,8 +525,13 @@ fun OsmMap(
             OsmMapConfig.init(viewCtx)
 
             MapView(viewCtx).apply {
-                // Prefer Carto CDN (reliable HTTPS); OSM policy-friendly with our UA.
-                setTileSource(OsmMapConfig.CARTO_VOYAGER)
+                // OSM HTTPS dulu (paling andal, UA sudah di-set), lalu fallback ke Carto.
+                val tileSources = arrayOf(
+                    OsmMapConfig.OSM_HTTPS,
+                    OsmMapConfig.CARTO_VOYAGER
+                )
+                var tileSourceIndex = 0
+                setTileSource(tileSources[tileSourceIndex])
                 setMultiTouchControls(true)
                 setTilesScaledToDpi(true)
                 isHorizontalMapRepetitionEnabled = true
@@ -461,6 +539,31 @@ fun OsmMap(
                 minZoomLevel = 3.0
                 maxZoomLevel = 20.0
                 zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+
+                // Auto-fallback: kalau tile gagal diunduh dari source utama
+                // (CDN diblokir / rate-limit / jaringan bermasalah), pindah ke
+                // source cadangan satu kali supaya peta tetap muncul.
+                tileProvider.getTileRequestCompleteHandlers().add(
+                    object : Handler(Looper.getMainLooper()) {
+                        override fun handleMessage(msg: Message) {
+                            if (msg.what == MapTileProviderBase.MAPTILE_FAIL_ID &&
+                                tileSourceIndex < tileSources.size - 1
+                            ) {
+                                tileSourceIndex++
+                                setTileSource(tileSources[tileSourceIndex])
+                                invalidate()
+                            }
+                        }
+                    }
+                )
+
+                if (!viewCtx.hasNetwork()) {
+                    Toast.makeText(
+                        viewCtx,
+                        "Tidak ada koneksi internet — tile peta tidak bisa dimuat",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
 
                 val pt = GeoPoint(currentLat, currentLng)
                 controller.setZoom(17.0)

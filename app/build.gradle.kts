@@ -16,9 +16,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // Default Android debug keystore (~/.android/debug.keystore) — works in CI and local.
+    // CATATAN: build release TIDAK punya signingConfig -> APK release TIDAK bertanda
+    // tangan (unsigned). Sebelum rilis publik, tambahkan signingConfig dengan keystore
+    // rilis dan set isMinifyEnabled sesuai kebutuhan R8.
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -70,4 +73,9 @@ dependencies {
     // Icons used (Settings/Place/Play/Close) are in the core set — avoid icons-extended bloat.
     implementation("androidx.compose.material:material-icons-core")
     implementation("org.osmdroid:osmdroid-android:6.1.18")
+
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:core-ktx:1.5.0")
+    androidTestImplementation("androidx.test:runner:1.5.2")
 }
