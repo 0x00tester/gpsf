@@ -247,15 +247,14 @@ fun GpsfApp() {
     var centerMapTrigger by remember { mutableIntStateOf(0) }
 
     val isRunning by MockLocationService.isRunning.collectAsStateWithLifecycle()
+    val runningLat by MockLocationService.currentLat.collectAsStateWithLifecycle()
+    val runningLng by MockLocationService.currentLng.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) {
-        if (MockLocationService.isRunning.value) {
-            lat = MockLocationService.currentLat.value
-            lng = MockLocationService.currentLng.value
-            centerMapTrigger++
-        }
-    }
+    // Saat mock berjalan, pin & koordinat mengikuti posisi simulasi secara live
+    // (random walk di dalam radius jitter). Saat berhenti, kembali ke pin target.
+    val displayLat = if (isRunning) runningLat else lat
+    val displayLng = if (isRunning) runningLng else lng
 
     LaunchedEffect(Unit) {
         MockLocationService.errorEvent.collectLatest { msg ->
@@ -299,8 +298,8 @@ fun GpsfApp() {
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             OsmMap(
                 modifier = Modifier.fillMaxSize(),
-                lat = lat,
-                lng = lng,
+                lat = displayLat,
+                lng = displayLng,
                 centerMapTrigger = centerMapTrigger,
                 onSelect = { newLat, newLng -> persistAndMaybeRetarget(newLat, newLng) }
             )
@@ -381,7 +380,7 @@ fun GpsfApp() {
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = String.format(Locale.US, "%.5f, %.5f", lat, lng),
+                            text = String.format(Locale.US, "%.5f, %.5f", displayLat, displayLng),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
